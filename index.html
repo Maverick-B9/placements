@@ -2235,6 +2235,7 @@ function addStu() {
 
 let _expandedComp = null;
 let _expandedSession = 1;
+let _assignListLimit = 30; // PERFORMANCE: Limit initial render to 30 students
 
 function renderByCompany(b) {
     const compCounts = {};
@@ -2297,6 +2298,7 @@ function filterCompList() {
 function toggleCompExpand(c) {
     _expandedComp = (_expandedComp === c) ? null : c;
     _expandedSession = 1;
+    _assignListLimit = 30; // Reset limit
     changeAdminTab('c');
 }
 
@@ -2340,6 +2342,9 @@ function _buildAssignStudentList(c, sessionNum, q) {
     const filtered = RAW.filter(s => !q || s.name.toLowerCase().includes(q.toLowerCase()) || s.usn.toLowerCase().includes(q.toLowerCase()));
     if (filtered.length === 0) return "<div style='padding:20px;text-align:center;color:var(--mut);font-size:11px'>No students found</div>";
 
+    // PERFORMANCE: Use the current limit to keep DOM light
+    const displayList = filtered.slice(0, _assignListLimit);
+
     let h = "<table style='width:100%;border-collapse:collapse'><thead><tr style='background:var(--surf2);position:sticky;top:0;z-index:10;box-shadow:0 1px 0 var(--bd)'>";
     h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>&#9744;</th>";
     h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>STUDENT</th>";
@@ -2347,7 +2352,7 @@ function _buildAssignStudentList(c, sessionNum, q) {
     h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>CURRENT S" + sessionNum + "</th>";
     h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>ACTION</th>";
     h += "</tr></thead><tbody style='position:relative'>";
-    filtered.forEach(s => {
+    displayList.forEach(s => {
         const sc = s.schedule[sessionIdx];
         const isAssigned = sc && sc.company === c;
         const otherComp = sc && sc.company && sc.company !== c ? sc.company : '';
@@ -2371,6 +2376,9 @@ function _buildAssignStudentList(c, sessionNum, q) {
         h += "</td></tr>";
     });
     h += "</tbody></table>";
+    if (filtered.length > _assignListLimit) {
+        h += "<div style='padding:20px;text-align:center'><button onclick='loadMoreAssignStudents()' style='padding:8px 20px;background:rgba(99,102,241,.1);border:1.5px solid var(--ind);color:var(--indl);border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;transition:.2s'>Load More Students (" + (filtered.length - _assignListLimit) + " left)</button></div>";
+    }
     return h;
 }
 
@@ -2381,12 +2389,18 @@ function filterAssignStudents(el) {
 
     if (_searchDebounce) clearTimeout(_searchDebounce);
     _searchDebounce = setTimeout(() => {
+        _assignListLimit = 30; // Reset limit on new search
+        _refreshAssignPanelUI(_expandedComp, _expandedSession - 1, q);
         const listEl = document.getElementById('assign-stu-list');
-        if (listEl) {
-            listEl.innerHTML = _buildAssignStudentList(_expandedComp, _expandedSession, q);
-            if (q.length > 0) listEl.scrollTop = 0;
-        }
-    }, 150); // Reduced to 150ms for snappier feel
+        if (listEl && q.length > 0) listEl.scrollTop = 0;
+    }, 200);
+}
+
+function loadMoreAssignStudents() {
+    if (!_expandedComp) return;
+    _assignListLimit += 30;
+    const q = (document.getElementById('assign-stu-q') || { value: '' }).value;
+    _refreshAssignPanelUI(_expandedComp, _expandedSession - 1, q);
 }
 
 function _refreshAssignPanelUI(companyName, sessionIdx, q) {
@@ -2411,6 +2425,7 @@ function _refreshAssignPanelUI(companyName, sessionIdx, q) {
 
 function switchAssignSession(sn) {
     _expandedSession = sn;
+    _assignListLimit = 30; // Reset limit
     changeAdminTab('c');
 }
 
@@ -2553,29 +2568,45 @@ function renderCredentials(b) {
     // Student credentials table
     h += "<div class='card'>";
     h += "<div class='ctit'><div class='dot'></div>STUDENT CREDENTIALS</div>";
-    h += "<div id='cred-stu-table' class='tw'></div></div>";
+    h += "<div id='cred-stu-table' class='tw'><div id='cred-list-wrap'></div></div></div>";
     b.innerHTML = h;
-    _renderCredStudents('');
+    _assignListLimit = 30; // Reset limit for credentials tab
+    filterCreds();
 }
 
 function _renderCredStudents(q) {
     const list = RAW.filter(s => !q || s.name.toLowerCase().includes(q) || s.usn.toLowerCase().includes(q));
+
+    // Performance: Limit to current _assignListLimit (sharing the state is fine here)
+    const slice = list.slice(0, _assignListLimit);
+
     let h = "<table><thead><tr><th>#</th><th>Student</th><th>Branch</th><th>Password</th><th>Actions</th></tr></thead><tbody>";
-    list.forEach((s, idx) => {
+    slice.forEach((s, idx) => {
         h += "<tr>";
         h += "<td style='color:var(--mut)'>" + (idx + 1) + "</td>";
         h += "<td><div class='nm'>" + s.name + "</div><div class='us'>" + s.usn + "</div></td>";
-        h += "<td style='font-size:11px;color:var(--mut)'>" + s.branch + "</td>";
-        h += "<td class='mu'>" + s.password + "</td>";
-        h += "<td style='white-space:nowrap'>";
-        h += "<button class='btn btg bts' onclick=\"updatePwCred('" + s.usn + "')\">&#128273; Change</button> ";
-        h += "<button class='btn btg bts' onclick=\"resetPCred('" + s.usn + "')\">&#8635; Reset</button>";
-        h += "</td></tr>";
+        h += "<td>" + (s.branch || '-') + "</td>";
+        h += "<td><div style='display:flex;align-items:center;gap:6px'><code style='background:rgba(99,102,241,.1);padding:2px 6px;border-radius:4px;color:var(--indl);font-size:10px'>" + s.password + "</code><span onclick=\"copyText('" + s.password + "')\" style='cursor:pointer;opacity:.5'>&#10697;</span></div></td>";
+        h += "<td><button class='btn btp bts' onclick=\"editStu('" + s.usn + "')\">Edit</button> <button class='btn btg bts' style='color:var(--red)' onclick=\"delStu('" + s.usn + "')\">Del</button></td>";
+        h += "</tr>";
     });
-    if (list.length > 100) h += "<tr><td colspan='5' style='text-align:center;color:var(--mut);font-size:10px;padding:10px'>Showing first 100 of " + list.length + " students. Use search to narrow down.</td></tr>";
     h += "</tbody></table>";
-    const el = document.getElementById('cred-stu-table');
-    if (el) el.innerHTML = h;
+
+    if (list.length > _assignListLimit) {
+        h += "<div style='padding:15px;text-align:center'><button onclick='loadMoreCredStudents()' style='padding:6px 16px;background:transparent;border:1px solid var(--bd2);color:var(--mut);border-radius:20px;font-size:10px;cursor:pointer'>Show More (" + (list.length - _assignListLimit) + " left)</button></div>";
+    }
+    return h;
+}
+
+function loadMoreCredStudents() {
+    _assignListLimit += 50;
+    filterCreds();
+}
+
+function filterCreds() {
+    const q = (document.getElementById('cred-q') || { value: '' }).value.toLowerCase();
+    const wrap = document.getElementById('cred-list-wrap');
+    if (wrap) wrap.innerHTML = _renderCredStudents(q);
 }
 
 function filterCredStudents() {
