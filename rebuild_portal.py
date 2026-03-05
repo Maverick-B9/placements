@@ -28,12 +28,24 @@ ws = wb['Master Student Schedule']
 students, companies_set = [], []
 
 # Skip the first two header rows based on inspection
-for row in ws.iter_rows(min_row=3, values_only=True):
-    cols = (list(row) + [None]*16)[:16]
-    si, name, usn, branch, gender, dob, p10, p12, cgpa, resume, c1, c2, c3, c4, c5, status_ok = cols
+# Use cell-object iteration (not values_only) to access hyperlinks for resume column
+for row in ws.iter_rows(min_row=3):
+    cells = list(row)
+    cols = [(c.value if c else None) for c in cells]
+    cols = (cols + [None]*16)[:16]
+    si, name, usn, branch, gender, dob, p10, p12, cgpa, resume_val, c1, c2, c3, c4, c5, status_ok = cols
     if not usn: continue
     dob_str = parse_dob(dob)
     password = dob_str if dob_str else '01/01/2000'
+
+    # Extract resume hyperlink URL (col index 9)
+    resume_url = ''
+    resume_cell = cells[9] if len(cells) > 9 else None
+    if resume_cell and resume_cell.hyperlink and resume_cell.hyperlink.target:
+        resume_url = resume_cell.hyperlink.target
+    elif resume_val and str(resume_val).strip().startswith('http'):
+        resume_url = str(resume_val).strip()
+
     schedule = []
     # Sessions are in columns 11-15 (indexed 10-14)
     for i, comp in enumerate([c1, c2, c3, c4, c5]):
@@ -50,7 +62,7 @@ for row in ws.iter_rows(min_row=3, values_only=True):
         "gender": str(gender).strip() if gender else '',
         "dob": dob_str, "pct10": str(p10) if p10 else '',
         "pct12": str(p12) if p12 else '', "cgpa": str(cgpa) if cgpa else '',
-        "resume": str(resume).strip() if resume else '',
+        "resume": resume_url,
         "schedule": schedule, "password": password
     })
 

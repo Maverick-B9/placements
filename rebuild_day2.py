@@ -13,6 +13,25 @@ TIMES = [
 wb = openpyxl.load_workbook('MITM_Placement_Fair_2026_Schedule (1).xlsx', data_only=True)
 ws = wb['Master Student Schedule']
 
+# ── Cross-reference Day 1 Excel for resume hyperlinks ──
+# Day 1 Excel has resume links as hyperlink objects in column [9]
+day1_resume_map = {}  # USN (upper) → Google Drive URL
+try:
+    wb1 = openpyxl.load_workbook('Placement_Drive_Schedule (2).xlsx')  # NOT data_only, need hyperlinks
+    ws1 = wb1['Master Student Schedule']
+    for row in ws1.iter_rows(min_row=3):
+        cells = list(row)
+        usn_val = cells[2].value if len(cells) > 2 else None
+        if not usn_val: continue
+        resume_cell = cells[9] if len(cells) > 9 else None
+        if resume_cell and resume_cell.hyperlink and resume_cell.hyperlink.target:
+            day1_resume_map[str(usn_val).strip().upper()] = resume_cell.hyperlink.target
+        elif resume_cell and resume_cell.value and str(resume_cell.value).strip().startswith('http'):
+            day1_resume_map[str(usn_val).strip().upper()] = str(resume_cell.value).strip()
+    print(f"Day 1 resume cross-ref: {len(day1_resume_map)} resume links loaded")
+except Exception as e:
+    print(f"Warning: Could not load Day 1 resume data: {e}")
+
 students, companies_set = [], []
 
 # Day 2 Excel has 13 columns (Row 2 = headers, data from Row 3):
@@ -25,6 +44,11 @@ for row in ws.iter_rows(min_row=3, values_only=True):
     if not usn: continue
     # No DOB in Day 2 Excel — use default password
     password = '01/01/2004'
+
+    # Look up resume from Day 1 by USN
+    usn_key = str(usn).strip().upper()
+    resume_url = day1_resume_map.get(usn_key, '')
+
     schedule = []
     for i, comp in enumerate([c1, c2, c3, c4, c5]):
         cname = str(comp).strip() if comp else ''
@@ -40,7 +64,7 @@ for row in ws.iter_rows(min_row=3, values_only=True):
         "gender": '',
         "dob": '', "pct10": '',
         "pct12": '', "cgpa": str(cgpa) if cgpa else '',
-        "resume": '',
+        "resume": resume_url,
         "schedule": schedule, "password": password
     })
 
