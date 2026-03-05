@@ -2340,6 +2340,10 @@ function _buildAssignStudentList(c, sessionNum, q) {
     const filtered = RAW.filter(s => !q || s.name.toLowerCase().includes(q.toLowerCase()) || s.usn.toLowerCase().includes(q.toLowerCase()));
     if (filtered.length === 0) return "<div style='padding:20px;text-align:center;color:var(--mut);font-size:11px'>No students found</div>";
 
+    // PERFORMANCE: Limit to first 100 matches to keep UI snappy.
+    // Matches will bubble up as the user types a search query.
+    const slice = filtered.slice(0, 100);
+
     let h = "<table style='width:100%;border-collapse:collapse'><thead><tr style='background:var(--surf2);position:sticky;top:0;z-index:10;box-shadow:0 1px 0 var(--bd)'>";
     h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>&#9744;</th>";
     h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>STUDENT</th>";
@@ -2347,7 +2351,7 @@ function _buildAssignStudentList(c, sessionNum, q) {
     h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>CURRENT S" + sessionNum + "</th>";
     h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>ACTION</th>";
     h += "</tr></thead><tbody style='position:relative'>";
-    filtered.forEach(s => {
+    slice.forEach(s => {
         const sc = s.schedule[sessionIdx];
         const isAssigned = sc && sc.company === c;
         const otherComp = sc && sc.company && sc.company !== c ? sc.company : '';
@@ -2370,21 +2374,44 @@ function _buildAssignStudentList(c, sessionNum, q) {
         }
         h += "</td></tr>";
     });
+    if (filtered.length > slice.length) {
+        h += "<tr><td colspan='5' style='text-align:center;padding:15px;color:var(--mut);font-size:10px'>Showing first 100 of " + filtered.length + " matches. Typing a specific name or USN will show more results.</td></tr>";
+    }
     h += "</tbody></table>";
     return h;
 }
 
+let _searchDebounce = null;
 function filterAssignStudents(el) {
     if (!_expandedComp) return;
     const q = el ? el.value : (document.getElementById('assign-stu-q') || { value: '' }).value;
+
+    // Add visual "searching" state if it feels slow
+    if (_searchDebounce) clearTimeout(_searchDebounce);
+
+    _searchDebounce = setTimeout(() => {
+        _refreshAssignPanelUI(_expandedComp, _expandedSession - 1, q);
+    }, 250); // 250ms debounce
+}
+
+function _refreshAssignPanelUI(companyName, sessionIdx, q) {
     const listEl = document.getElementById('assign-stu-list');
     if (listEl) {
-        const oldScroll = listEl.scrollTop;
-        listEl.innerHTML = _buildAssignStudentList(_expandedComp, _expandedSession, q);
-        // If q is short, maybe stay at top, but if they were scrolling and typing, 
-        // sometimes they want to keep position. For search, usually top is best though.
-        if (q.length > 0) listEl.scrollTop = 0;
+        listEl.innerHTML = _buildAssignStudentList(companyName, sessionIdx + 1, q);
+        if (q && q.length > 0) listEl.scrollTop = 0;
     }
+
+    const safeName = companyName.replace(/[^a-z0-9]/gi, '_');
+    const tabEl = document.getElementById('cs-tab-' + safeName + '-' + (sessionIdx + 1));
+    const cnt = RAW.filter(st => st.schedule[sessionIdx] && st.schedule[sessionIdx].company === companyName).length;
+    if (tabEl) tabEl.textContent = 'Session ' + (sessionIdx + 1) + ' (' + cnt + ')';
+
+    const footerEl = document.getElementById('cs-footer-' + safeName + '-' + (sessionIdx + 1));
+    if (footerEl) footerEl.textContent = cnt + ' assigned to this session';
+
+    const totalCntEl = document.getElementById('comp-cnt-' + safeName);
+    const totalDistinct = RAW.filter(st => st.schedule.some(sci => sci.company === companyName)).length;
+    if (totalCntEl) totalCntEl.textContent = totalDistinct + ' students';
 }
 
 function switchAssignSession(sn) {
@@ -2399,27 +2426,13 @@ function toggleAssign(usn, sessionIdx, assign, companyName) {
     sc.company = assign ? companyName : '';
     _cloudSaveChange(usn, sessionIdx, sc);
 
-    // UI REFRESH - INCREMENTAL instead of full re-render
     const q = (document.getElementById('assign-stu-q') || { value: '' }).value;
-    const listEl = document.getElementById('assign-stu-list');
-    if (listEl) listEl.innerHTML = _buildAssignStudentList(companyName, sessionIdx + 1, q);
-
-    // Update individual tab counts if elements exist
-    const safeName = companyName.replace(/[^a-z0-9]/gi, '_');
-    const tabEl = document.getElementById('cs-tab-' + safeName + '-' + (sessionIdx + 1));
-    const cnt = RAW.filter(st => st.schedule[sessionIdx] && st.schedule[sessionIdx].company === companyName).length;
-    if (tabEl) tabEl.textContent = 'Session ' + (sessionIdx + 1) + ' (' + cnt + ')';
-
-    const footerEl = document.getElementById('cs-footer-' + safeName + '-' + (sessionIdx + 1));
-    if (footerEl) footerEl.textContent = cnt + ' assigned to this session';
-
-    const totalCntEl = document.getElementById('comp-cnt-' + safeName);
-    const totalDistinct = RAW.filter(st => st.schedule.some(sci => sci.company === companyName)).length;
-    if (totalCntEl) totalCntEl.textContent = totalDistinct + ' students';
+    _refreshAssignPanelUI(companyName, sessionIdx, q);
 }
 
 function bulkAssignAll(companyName) {
-    const q = (document.getElementById('assign-stu-q') || { value: '' }).value.toLowerCase();
+    const qValue = (document.getElementById('assign-stu-q') || { value: '' }).value;
+    const q = qValue.toLowerCase();
     const sessionIdx = _expandedSession - 1;
     const filtered = RAW.filter(s => !q || s.name.toLowerCase().includes(q) || s.usn.toLowerCase().includes(q));
     let changeCount = 0;
@@ -2430,7 +2443,7 @@ function bulkAssignAll(companyName) {
             changeCount++;
         }
     });
-    if (changeCount > 0) toggleAssign('', sessionIdx, true, companyName); // trigger shared UI update logic (passing empty USN is safe since toggleAssign handles it at top)
+    if (changeCount > 0) _refreshAssignPanelUI(companyName, sessionIdx, qValue);
 }
 
 function bulkClearAll(companyName) {
@@ -2444,7 +2457,7 @@ function bulkClearAll(companyName) {
             changeCount++;
         }
     });
-    if (changeCount > 0) toggleAssign('', sessionIdx, false, companyName);
+    if (changeCount > 0) _refreshAssignPanelUI(companyName, sessionIdx, '');
 }
 
 function addComp() {
