@@ -579,10 +579,6 @@ function _buildAssignStudentList(c, sessionNum, q) {
     const filtered = RAW.filter(s => !q || s.name.toLowerCase().includes(q.toLowerCase()) || s.usn.toLowerCase().includes(q.toLowerCase()));
     if (filtered.length === 0) return "<div style='padding:20px;text-align:center;color:var(--mut);font-size:11px'>No students found</div>";
 
-    // PERFORMANCE: Limit to first 100 matches to keep UI snappy.
-    // Matches will bubble up as the user types a search query.
-    const slice = filtered.slice(0, 100);
-
     let h = "<table style='width:100%;border-collapse:collapse'><thead><tr style='background:var(--surf2);position:sticky;top:0;z-index:10;box-shadow:0 1px 0 var(--bd)'>";
     h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>&#9744;</th>";
     h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>STUDENT</th>";
@@ -590,7 +586,7 @@ function _buildAssignStudentList(c, sessionNum, q) {
     h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>CURRENT S" + sessionNum + "</th>";
     h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>ACTION</th>";
     h += "</tr></thead><tbody style='position:relative'>";
-    slice.forEach(s => {
+    filtered.forEach(s => {
         const sc = s.schedule[sessionIdx];
         const isAssigned = sc && sc.company === c;
         const otherComp = sc && sc.company && sc.company !== c ? sc.company : '';
@@ -613,9 +609,6 @@ function _buildAssignStudentList(c, sessionNum, q) {
         }
         h += "</td></tr>";
     });
-    if (filtered.length > slice.length) {
-        h += "<tr><td colspan='5' style='text-align:center;padding:15px;color:var(--mut);font-size:10px'>Showing first 100 of " + filtered.length + " matches. Typing a specific name or USN will show more results.</td></tr>";
-    }
     h += "</tbody></table>";
     return h;
 }
@@ -625,19 +618,21 @@ function filterAssignStudents(el) {
     if (!_expandedComp) return;
     const q = el ? el.value : (document.getElementById('assign-stu-q') || { value: '' }).value;
 
-    // Add visual "searching" state if it feels slow
     if (_searchDebounce) clearTimeout(_searchDebounce);
-
     _searchDebounce = setTimeout(() => {
-        _refreshAssignPanelUI(_expandedComp, _expandedSession - 1, q);
-    }, 250); // 250ms debounce
+        const listEl = document.getElementById('assign-stu-list');
+        if (listEl) {
+            listEl.innerHTML = _buildAssignStudentList(_expandedComp, _expandedSession, q);
+            if (q.length > 0) listEl.scrollTop = 0;
+        }
+    }, 150); // Reduced to 150ms for snappier feel
 }
 
 function _refreshAssignPanelUI(companyName, sessionIdx, q) {
     const listEl = document.getElementById('assign-stu-list');
     if (listEl) {
         listEl.innerHTML = _buildAssignStudentList(companyName, sessionIdx + 1, q);
-        if (q && q.length > 0) listEl.scrollTop = 0;
+        // Do NOT auto-scroll to top when merely adding/removing, only on search
     }
 
     const safeName = companyName.replace(/[^a-z0-9]/gi, '_');
@@ -674,29 +669,62 @@ function bulkAssignAll(companyName) {
     const q = qValue.toLowerCase();
     const sessionIdx = _expandedSession - 1;
     const filtered = RAW.filter(s => !q || s.name.toLowerCase().includes(q) || s.usn.toLowerCase().includes(q));
+
+    const batch = db.batch();
     let changeCount = 0;
+
     filtered.forEach(s => {
         if (s.schedule[sessionIdx] && s.schedule[sessionIdx].company !== companyName) {
             s.schedule[sessionIdx].company = companyName;
-            _cloudSaveChange(s.usn, sessionIdx, s.schedule[sessionIdx]);
+            const docId = s.usn + '_' + sessionIdx;
+            const ref = db.collection('changes').doc(docId);
+            const sc = s.schedule[sessionIdx];
+            batch.set(ref, {
+                status: sc.status || 'pending',
+                result: sc.result || '',
+                remark: sc.remark || '',
+                company: sc.company || '',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
             changeCount++;
         }
     });
-    if (changeCount > 0) _refreshAssignPanelUI(companyName, sessionIdx, qValue);
+
+    if (changeCount > 0) {
+        batch.commit().then(() => { console.log('[Cloud] Bulk assign success'); })
+            .catch(e => { console.warn('[Cloud] Bulk assign failed:', e); });
+        _refreshAssignPanelUI(companyName, sessionIdx, qValue);
+    }
 }
 
 function bulkClearAll(companyName) {
     if (!confirm('Remove all students from ' + companyName + ' Session ' + _expandedSession + '?')) return;
     const sessionIdx = _expandedSession - 1;
+    const batch = db.batch();
     let changeCount = 0;
+
     RAW.forEach(s => {
         if (s.schedule[sessionIdx] && s.schedule[sessionIdx].company === companyName) {
             s.schedule[sessionIdx].company = '';
-            _cloudSaveChange(s.usn, sessionIdx, s.schedule[sessionIdx]);
+            const docId = s.usn + '_' + sessionIdx;
+            const ref = db.collection('changes').doc(docId);
+            const sc = s.schedule[sessionIdx];
+            batch.set(ref, {
+                status: sc.status || 'pending',
+                result: sc.result || '',
+                remark: sc.remark || '',
+                company: '',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
             changeCount++;
         }
     });
-    if (changeCount > 0) _refreshAssignPanelUI(companyName, sessionIdx, '');
+
+    if (changeCount > 0) {
+        batch.commit().then(() => { console.log('[Cloud] Bulk clear success'); })
+            .catch(e => { console.warn('[Cloud] Bulk clear failed:', e); });
+        _refreshAssignPanelUI(companyName, sessionIdx, '');
+    }
 }
 
 function addComp() {
