@@ -506,7 +506,8 @@ function _buildCompanyListHTML(sorted, compCounts) {
         h += "<td class='nm' style='cursor:pointer' onclick=\"toggleCompExpand('" + c.replace(/'/g, "\\'") + "')\">"
             + "<span style='margin-right:6px;font-size:11px'>" + (isExpanded ? '&#9660;' : '&#9654;') + "</span>" + c + "</td>";
         h += "<td><span style='color:var(--cyn);font-size:11px;font-weight:600'>" + room + "</span></td>";
-        h += "<td><span style='background:var(--ind);color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700'>"
+        const safeName = c.replace(/[^a-z0-9]/gi, '_');
+        h += "<td><span id='comp-cnt-" + safeName + "' style='background:var(--ind);color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700'>"
             + compCounts[c] + " students</span></td>";
         h += "<td style='white-space:nowrap'>";
         h += "<button class='btn btg bts' onclick=\"toggleCompExpand('" + c.replace(/'/g, "\\'") + "')\">&#128101; Assign Students</button> ";
@@ -552,7 +553,8 @@ function _buildCompanyAssignPanel(c) {
     for (let sn = 1; sn <= 5; sn++) {
         const cnt = RAW.filter(s => s.schedule[sn - 1] && s.schedule[sn - 1].company === c).length;
         const active = _expandedSession === sn;
-        h += "<div onclick='switchAssignSession(" + sn + ")' style='cursor:pointer;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid " + (active ? 'var(--ind)' : 'var(--bd)') + ";background:" + (active ? 'var(--ind)' : 'transparent') + ";color:" + (active ? '#fff' : 'var(--mut)') + "'>Session " + sn + " (" + cnt + ")</div>";
+        const safeName = c.replace(/[^a-z0-9]/gi, '_');
+        h += "<div id='cs-tab-" + safeName + "-" + sn + "' onclick='switchAssignSession(" + sn + ")' style='cursor:pointer;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid " + (active ? 'var(--ind)' : 'var(--bd)') + ";background:" + (active ? 'var(--ind)' : 'transparent') + ";color:" + (active ? '#fff' : 'var(--mut)') + "'>Session " + sn + " (" + cnt + ")</div>";
     }
     h += "</div>";
     h += "<div style='font-size:10px;color:var(--mut);margin-bottom:10px'>" + times[_expandedSession - 1] + "</div>";
@@ -565,7 +567,9 @@ function _buildCompanyAssignPanel(c) {
     h += "<div style='display:flex;gap:8px;margin-top:10px;align-items:center'>";
     h += "<button onclick=\"bulkAssignAll('" + c.replace(/'/g, "\\'") + "')\" class='btn btp bts'>&#10003; Assign All Visible</button>";
     h += "<button onclick=\"bulkClearAll('" + c.replace(/'/g, "\\'") + "')\" class='btn btg bts' style='color:var(--red)'>&#10005; Clear All</button>";
-    h += "<span style='font-size:10px;color:var(--mut);margin-left:auto'>" + RAW.filter(s => s.schedule[_expandedSession - 1] && s.schedule[_expandedSession - 1].company === c).length + " assigned to this session</span>";
+    const totalAssigned = RAW.filter(s => s.schedule[_expandedSession - 1] && s.schedule[_expandedSession - 1].company === c).length;
+    const safeName = c.replace(/[^a-z0-9]/gi, '_');
+    h += "<span id='cs-footer-" + safeName + "-" + _expandedSession + "' style='font-size:10px;color:var(--mut);margin-left:auto'>" + totalAssigned + " assigned to this session</span>";
     h += "</div></div>";
     return h;
 }
@@ -574,6 +578,10 @@ function _buildAssignStudentList(c, sessionNum, q) {
     const sessionIdx = sessionNum - 1;
     const filtered = RAW.filter(s => !q || s.name.toLowerCase().includes(q.toLowerCase()) || s.usn.toLowerCase().includes(q.toLowerCase()));
     if (filtered.length === 0) return "<div style='padding:20px;text-align:center;color:var(--mut);font-size:11px'>No students found</div>";
+
+    // Performance: Limit to first 100 matches to keep UI responsive
+    const slice = filtered.slice(0, 100);
+
     let h = "<table style='width:100%;border-collapse:collapse'><thead><tr style='background:var(--surf2)'>";
     h += "<th style='padding:8px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:600'>&#9744;</th>";
     h += "<th style='padding:8px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:600'>STUDENT</th>";
@@ -581,7 +589,7 @@ function _buildAssignStudentList(c, sessionNum, q) {
     h += "<th style='padding:8px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:600'>CURRENT S" + sessionNum + "</th>";
     h += "<th style='padding:8px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:600'>ACTION</th>";
     h += "</tr></thead><tbody>";
-    filtered.forEach(s => {
+    slice.forEach(s => {
         const sc = s.schedule[sessionIdx];
         const isAssigned = sc && sc.company === c;
         const otherComp = sc && sc.company && sc.company !== c ? sc.company : '';
@@ -604,6 +612,9 @@ function _buildAssignStudentList(c, sessionNum, q) {
         }
         h += "</td></tr>";
     });
+    if (filtered.length > 100) {
+        h += "<tr><td colspan='5' style='text-align:center;padding:12px;color:var(--mut);font-size:10px'>... showing first 100 matches out of " + filtered.length + ". Use search to find specifically.</td></tr>";
+    }
     h += "</tbody></table>";
     return h;
 }
@@ -626,37 +637,53 @@ function toggleAssign(usn, sessionIdx, assign, companyName) {
     const sc = s.schedule[sessionIdx];
     sc.company = assign ? companyName : '';
     _cloudSaveChange(usn, sessionIdx, sc);
-    // Refresh just the student list inside the panel
+
+    // UI REFRESH - INCREMENTAL instead of full re-render
     const q = (document.getElementById('assign-stu-q') || { value: '' }).value;
     const listEl = document.getElementById('assign-stu-list');
     if (listEl) listEl.innerHTML = _buildAssignStudentList(companyName, sessionIdx + 1, q);
-    // Update session tab counts
-    changeAdminTab('c');
+
+    // Update individual tab counts if elements exist
+    const safeName = companyName.replace(/[^a-z0-9]/gi, '_');
+    const tabEl = document.getElementById('cs-tab-' + safeName + '-' + (sessionIdx + 1));
+    const cnt = RAW.filter(st => st.schedule[sessionIdx] && st.schedule[sessionIdx].company === companyName).length;
+    if (tabEl) tabEl.textContent = 'Session ' + (sessionIdx + 1) + ' (' + cnt + ')';
+
+    const footerEl = document.getElementById('cs-footer-' + safeName + '-' + (sessionIdx + 1));
+    if (footerEl) footerEl.textContent = cnt + ' assigned to this session';
+
+    const totalCntEl = document.getElementById('comp-cnt-' + safeName);
+    const totalDistinct = RAW.filter(st => st.schedule.some(sci => sci.company === companyName)).length;
+    if (totalCntEl) totalCntEl.textContent = totalDistinct + ' students';
 }
 
 function bulkAssignAll(companyName) {
     const q = (document.getElementById('assign-stu-q') || { value: '' }).value.toLowerCase();
     const sessionIdx = _expandedSession - 1;
     const filtered = RAW.filter(s => !q || s.name.toLowerCase().includes(q) || s.usn.toLowerCase().includes(q));
+    let changeCount = 0;
     filtered.forEach(s => {
         if (s.schedule[sessionIdx] && s.schedule[sessionIdx].company !== companyName) {
             s.schedule[sessionIdx].company = companyName;
             _cloudSaveChange(s.usn, sessionIdx, s.schedule[sessionIdx]);
+            changeCount++;
         }
     });
-    changeAdminTab('c');
+    if (changeCount > 0) toggleAssign('', sessionIdx, true, companyName); // trigger shared UI update logic (passing empty USN is safe since toggleAssign handles it at top)
 }
 
 function bulkClearAll(companyName) {
     if (!confirm('Remove all students from ' + companyName + ' Session ' + _expandedSession + '?')) return;
     const sessionIdx = _expandedSession - 1;
+    let changeCount = 0;
     RAW.forEach(s => {
         if (s.schedule[sessionIdx] && s.schedule[sessionIdx].company === companyName) {
             s.schedule[sessionIdx].company = '';
             _cloudSaveChange(s.usn, sessionIdx, s.schedule[sessionIdx]);
+            changeCount++;
         }
     });
-    changeAdminTab('c');
+    if (changeCount > 0) toggleAssign('', sessionIdx, false, companyName);
 }
 
 function addComp() {
