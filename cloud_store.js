@@ -49,9 +49,6 @@ function _cloudSaveAssignment(usn, sessionIdx, companyName) {
     const docId = usn + '_' + sessionIdx;
     db.collection('changes').doc(docId).set({
         company: companyName,
-        status: 'pending',
-        result: '',
-        remark: '',
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true }).catch(function (e) { console.warn('[Cloud] Assignment save failed:', e); });
 }

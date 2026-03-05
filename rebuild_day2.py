@@ -68,6 +68,31 @@ for row in ws.iter_rows(min_row=3, values_only=True):
         "schedule": schedule, "password": password
     })
 
+# ── Cross-reference Day 1 Excel for missing resumes ──────────────────────────
+day1_resume_map = {}
+try:
+    wb1 = openpyxl.load_workbook('Placement_Drive_Schedule (2).xlsx', data_only=True)
+    ws1 = wb1['Master Student Schedule']
+    for row in ws1.iter_rows(min_row=3, values_only=True):
+        cols1 = (list(row) + [None]*16)[:16]
+        usn1 = cols1[2]
+        resume1 = cols1[9]   # Resume is column index 9 in Day 1 Excel
+        if usn1 and resume1:
+            r = str(resume1).strip()
+            if r and r.lower() != 'none':
+                day1_resume_map[str(usn1).strip()] = r
+    print(f"Day 1 resume lookup: {len(day1_resume_map)} students have resumes")
+except Exception as e:
+    print(f"Warning: Could not load Day 1 Excel for resume cross-reference: {e}")
+
+# Fill in missing resumes from Day 1
+filled = 0
+for stu in students:
+    if not stu['resume'] and stu['usn'] in day1_resume_map:
+        stu['resume'] = day1_resume_map[stu['usn']]
+        filled += 1
+print(f"Filled {filled} missing resumes from Day 1 data")
+
 companies_list = sorted(companies_set)
 print(f"Day 2 Parsed: {len(students)} students, {len(companies_list)} companies")
 

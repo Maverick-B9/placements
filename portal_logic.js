@@ -246,6 +246,55 @@ function renderOverview(b) {
         h += "<td style='color:var(--grn);font-weight:700'>" + (st.selected || 0) + "</td><td style='color:var(--red);font-weight:700'>" + (st.rejected || 0) + "</td><td style='color:var(--amb);font-weight:700'>" + (st.next_round || 0) + "</td></tr>";
     });
     h += "</tbody></table></div></div></div>";
+
+    // ── INTERVIEW ATTENDANCE TRACKER ──────────────────────────────────────────
+    const attendeeMap = {}; // usn -> { name, branch, companies: Set }
+    RAW.forEach(s => {
+        s.schedule.forEach(sc => {
+            if (sc.status === 'selection' && sc.company) {
+                if (!attendeeMap[s.usn]) attendeeMap[s.usn] = { name: s.name, branch: s.branch || '—', companies: new Set() };
+                attendeeMap[s.usn].companies.add(sc.company);
+            }
+        });
+    });
+    const attendees = Object.entries(attendeeMap).sort((a, b) => b[1].companies.size - a[1].companies.size);
+    const distinctCount = attendees.length;
+
+    // Company-wise distinct attendee counts
+    const compAttendeeCount = {};
+    attendees.forEach(([, info]) => {
+        info.companies.forEach(c => { compAttendeeCount[c] = (compAttendeeCount[c] || 0) + 1; });
+    });
+
+    h += "<div style='font-size:9px;font-weight:700;color:var(--mut);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px;margin-top:22px'>INTERVIEW ATTENDANCE TRACKER</div>";
+    h += "<div class='sg admin-stats' style='grid-template-columns:repeat(3,1fr);margin-bottom:14px'>";
+    h += "<div class='sc si'><div class='sl'>DISTINCT ATTENDEES</div><div class='sv'>" + distinctCount + "</div></div>";
+    h += "<div class='sc sp'><div class='sl'>TOTAL STUDENTS</div><div class='sv'>" + RAW.length + "</div></div>";
+    const attendRate = RAW.length > 0 ? Math.round((distinctCount / RAW.length) * 100) : 0;
+    h += "<div class='sc sg2'><div class='sl'>ATTENDANCE RATE</div><div class='sv'>" + attendRate + "%</div></div>";
+    h += "</div>";
+
+    h += "<div class='admin-two-col' style='display:grid;grid-template-columns:1fr 1fr;gap:16px'>";
+
+    // Company-wise attendee count
+    h += "<div class='card'><div class='ctit'><div class='dot'></div>COMPANY-WISE INTERVIEW ATTENDEES</div><div class='tw' style='max-height:420px;overflow-y:auto'><table><thead><tr><th>Company</th><th>Distinct Students Attended</th></tr></thead><tbody>";
+    Object.entries(compAttendeeCount).sort((a, b) => b[1] - a[1]).forEach(([c, cnt]) => {
+        h += "<tr><td class='nm'>" + c + "</td><td style='font-weight:700;color:var(--ind)'>" + cnt + "</td></tr>";
+    });
+    h += "</tbody></table></div></div>";
+
+    // Detailed student-wise attendance
+    h += "<div class='card'><div class='ctit'><div class='dot'></div>STUDENT-WISE INTERVIEW DETAILS</div><div class='tw' style='max-height:420px;overflow-y:auto'><table><thead><tr><th>#</th><th>Student</th><th>Branch</th><th>Companies Attended</th></tr></thead><tbody>";
+    attendees.forEach(([usn, info], idx) => {
+        const compTags = Array.from(info.companies).map(c => "<span style='background:rgba(99,102,241,.12);color:var(--ind);padding:1px 7px;border-radius:10px;font-size:9px;font-weight:600;margin:1px;display:inline-block'>" + c.substring(0, 18) + "</span>").join(' ');
+        h += "<tr><td style='color:var(--mut)'>" + (idx + 1) + "</td>";
+        h += "<td><div class='nm'>" + info.name + "</div><div class='us'>" + usn + "</div></td>";
+        h += "<td style='font-size:11px;color:var(--mut)'>" + info.branch + "</td>";
+        h += "<td style='max-width:260px'>" + compTags + "</td></tr>";
+    });
+    if (attendees.length === 0) h += "<tr><td colspan='4' style='text-align:center;padding:20px;color:var(--mut);font-size:11px'>No students have been marked as present yet</td></tr>";
+    h += "</tbody></table></div></div></div>";
+
     b.innerHTML = h;
 }
 
@@ -361,12 +410,9 @@ function applyAssign(usn, sessionIdx) {
     const sel = document.getElementById('am-comp-' + (sessionIdx + 1));
     if (!sel) return;
     const companyName = sel.value;
-    s.schedule[sessionIdx].company = companyName;
-    if (companyName) {
-        _cloudSaveAssignment(usn, sessionIdx, companyName);
-    } else {
-        _cloudSaveChange(usn, sessionIdx, s.schedule[sessionIdx]);
-    }
+    const sc = s.schedule[sessionIdx];
+    sc.company = companyName;
+    _cloudSaveChange(usn, sessionIdx, sc);
     openAssignModal(usn); // refresh modal
     filterStu();
 }
@@ -577,12 +623,9 @@ function switchAssignSession(sn) {
 function toggleAssign(usn, sessionIdx, assign, companyName) {
     const s = RAW.find(x => x.usn === usn);
     if (!s || !s.schedule[sessionIdx]) return;
-    s.schedule[sessionIdx].company = assign ? companyName : '';
-    if (assign) {
-        _cloudSaveAssignment(usn, sessionIdx, companyName);
-    } else {
-        _cloudSaveChange(usn, sessionIdx, s.schedule[sessionIdx]);
-    }
+    const sc = s.schedule[sessionIdx];
+    sc.company = assign ? companyName : '';
+    _cloudSaveChange(usn, sessionIdx, sc);
     // Refresh just the student list inside the panel
     const q = (document.getElementById('assign-stu-q') || { value: '' }).value;
     const listEl = document.getElementById('assign-stu-list');
@@ -598,7 +641,7 @@ function bulkAssignAll(companyName) {
     filtered.forEach(s => {
         if (s.schedule[sessionIdx] && s.schedule[sessionIdx].company !== companyName) {
             s.schedule[sessionIdx].company = companyName;
-            _cloudSaveAssignment(s.usn, sessionIdx, companyName);
+            _cloudSaveChange(s.usn, sessionIdx, s.schedule[sessionIdx]);
         }
     });
     changeAdminTab('c');
