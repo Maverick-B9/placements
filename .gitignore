@@ -1,0 +1,16 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Project specific
+Master Copy of Students for Placement Drive.xlsx
+students_extracted.json
+err.txt
+excel_info.txt
+col_map.txt
+*.log
