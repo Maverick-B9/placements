@@ -559,8 +559,8 @@ function _buildCompanyAssignPanel(c) {
     h += "</div>";
     h += "<div style='font-size:10px;color:var(--mut);margin-bottom:10px'>" + times[_expandedSession - 1] + "</div>";
     // Student checklist with search
-    h += "<input type='text' id='assign-stu-q' placeholder='Search students...' oninput='filterAssignStudents()' style='width:100%;padding:8px 12px;background:var(--surf);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:11px;margin-bottom:10px;box-sizing:border-box'>";
-    h += "<div id='assign-stu-list' style='max-height:320px;overflow-y:auto;border:1px solid var(--bd);border-radius:8px;background:var(--surf)'>";
+    h += "<input type='text' id='assign-stu-q' placeholder='Search students...' oninput='filterAssignStudents(this)' style='width:100%;padding:10px 14px;background:var(--surf);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:12px;margin-bottom:12px;box-sizing:border-box;outline:none;box-shadow:0 2px 10px rgba(0,0,0,.1)'>";
+    h += "<div id='assign-stu-list' style='max-height:400px;overflow-y:auto;border:1px solid var(--bd);border-radius:8px;background:var(--surf);position:relative'>";
     h += _buildAssignStudentList(c, _expandedSession, '');
     h += "</div>";
     // Bulk actions
@@ -579,17 +579,14 @@ function _buildAssignStudentList(c, sessionNum, q) {
     const filtered = RAW.filter(s => !q || s.name.toLowerCase().includes(q.toLowerCase()) || s.usn.toLowerCase().includes(q.toLowerCase()));
     if (filtered.length === 0) return "<div style='padding:20px;text-align:center;color:var(--mut);font-size:11px'>No students found</div>";
 
-    // Performance: Limit to first 100 matches to keep UI responsive
-    const slice = filtered.slice(0, 100);
-
-    let h = "<table style='width:100%;border-collapse:collapse'><thead><tr style='background:var(--surf2)'>";
-    h += "<th style='padding:8px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:600'>&#9744;</th>";
-    h += "<th style='padding:8px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:600'>STUDENT</th>";
-    h += "<th style='padding:8px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:600'>BRANCH</th>";
-    h += "<th style='padding:8px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:600'>CURRENT S" + sessionNum + "</th>";
-    h += "<th style='padding:8px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:600'>ACTION</th>";
-    h += "</tr></thead><tbody>";
-    slice.forEach(s => {
+    let h = "<table style='width:100%;border-collapse:collapse'><thead><tr style='background:var(--surf2);position:sticky;top:0;z-index:10;box-shadow:0 1px 0 var(--bd)'>";
+    h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>&#9744;</th>";
+    h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>STUDENT</th>";
+    h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>BRANCH</th>";
+    h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>CURRENT S" + sessionNum + "</th>";
+    h += "<th style='padding:10px 12px;text-align:left;font-size:10px;color:var(--mut);font-weight:700'>ACTION</th>";
+    h += "</tr></thead><tbody style='position:relative'>";
+    filtered.forEach(s => {
         const sc = s.schedule[sessionIdx];
         const isAssigned = sc && sc.company === c;
         const otherComp = sc && sc.company && sc.company !== c ? sc.company : '';
@@ -612,18 +609,21 @@ function _buildAssignStudentList(c, sessionNum, q) {
         }
         h += "</td></tr>";
     });
-    if (filtered.length > 100) {
-        h += "<tr><td colspan='5' style='text-align:center;padding:12px;color:var(--mut);font-size:10px'>... showing first 100 matches out of " + filtered.length + ". Use search to find specifically.</td></tr>";
-    }
     h += "</tbody></table>";
     return h;
 }
 
-function filterAssignStudents() {
+function filterAssignStudents(el) {
     if (!_expandedComp) return;
-    const q = (document.getElementById('assign-stu-q') || { value: '' }).value;
+    const q = el ? el.value : (document.getElementById('assign-stu-q') || { value: '' }).value;
     const listEl = document.getElementById('assign-stu-list');
-    if (listEl) listEl.innerHTML = _buildAssignStudentList(_expandedComp, _expandedSession, q);
+    if (listEl) {
+        const oldScroll = listEl.scrollTop;
+        listEl.innerHTML = _buildAssignStudentList(_expandedComp, _expandedSession, q);
+        // If q is short, maybe stay at top, but if they were scrolling and typing, 
+        // sometimes they want to keep position. For search, usually top is best though.
+        if (q.length > 0) listEl.scrollTop = 0;
+    }
 }
 
 function switchAssignSession(sn) {
@@ -759,7 +759,7 @@ function renderCredentials(b) {
 function _renderCredStudents(q) {
     const list = RAW.filter(s => !q || s.name.toLowerCase().includes(q) || s.usn.toLowerCase().includes(q));
     let h = "<table><thead><tr><th>#</th><th>Student</th><th>Branch</th><th>Password</th><th>Actions</th></tr></thead><tbody>";
-    list.slice(0, 100).forEach((s, idx) => {
+    list.forEach((s, idx) => {
         h += "<tr>";
         h += "<td style='color:var(--mut)'>" + (idx + 1) + "</td>";
         h += "<td><div class='nm'>" + s.name + "</div><div class='us'>" + s.usn + "</div></td>";
