@@ -1887,17 +1887,43 @@ function renderStudent() {
     let h = `<div class='wb'><div><div class='wbn'>Welcome, ${CUR.name}</div><div class='wbs'>${CUR.branch} &middot; ${CUR.usn}</div></div><div class='wbb'>Student Dashboard</div></div>`;
 
     if (selections.length > 0) {
-        h += `<div class='card' style='margin-bottom:20px;background:linear-gradient(135deg, rgba(34,197,94,0.1), rgba(34,197,94,0.02));border:1px solid var(--grn)'>
-            <div class='ctit' style='color:var(--grn)'><div class='dot' style='background:var(--grn)'></div>PLACEMENT SUCCESS — CONGRATULATIONS!</div>
-            <div style='padding:4px 0 10px 0;display:flex;flex-wrap:wrap;gap:10px'>`;
+        h += `<div class='card success-card' style='margin-bottom:24px;background:linear-gradient(135deg, #1a1c2e 0%, #0f172a 100%);border:2px solid var(--grn);padding:30px;position:relative;overflow:hidden;box-shadow:0 20px 50px rgba(34,197,94,0.15);border-radius:20px'>
+            <div style='position:absolute;top:-20px;right:-20px;font-size:120px;opacity:0.05;pointer-events:none'>🎉</div>
+            <div style='position:absolute;bottom:-20px;left:-20px;font-size:80px;opacity:0.05;pointer-events:none;transform:rotate(-15deg)'>🎊</div>
+            
+            <div style='position:relative;z-index:10'>
+                <div style='display:flex;align-items:center;gap:12px;margin-bottom:16px'>
+                    <div style='background:var(--grn);color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 0 20px var(--grn)'>★</div>
+                    <div style='font-size:11px;font-weight:800;color:var(--grn);letter-spacing:2px;text-transform:uppercase'>OFFICIAL PLACEMENT SUCCESS</div>
+                </div>
+                
+                <h2 style='font-size:28px;font-weight:900;color:#fff;margin:0 0 8px 0;line-height:1.2;background:linear-gradient(to right, #fff, #94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent'>Congratulations, ${CUR.name}!</h2>
+                <p style='font-size:14px;color:rgba(255,255,255,0.7);margin:0 0 24px 0'>You've made us proud. Your hard work has paid off with the following placement(s):</p>
+                
+                <div style='display:flex;flex-wrap:wrap;gap:16px'>`;
         selections.forEach(sel => {
-            h += `<div style='background:white;border:1px solid var(--grn);padding:10px 16px;border-radius:12px;display:flex;flex-direction:column;gap:4px;box-shadow:0 4px 12px rgba(34,197,94,0.1)'>
-                <div style='font-size:10px;font-weight:700;color:var(--grn);letter-spacing:0.5px'>SELECTED BY</div>
-                <div style='font-size:14px;font-weight:800;color:var(--tx)'>${sel.company}</div>
-                <div style='font-size:10px;color:var(--mut)'>${sel.time}</div>
+            h += `<div style='background:rgba(255,255,255,0.03);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);padding:20px 24px;border-radius:16px;display:flex;flex-direction:column;gap:6px;min-width:240px;flex:1;transition:transform 0.3s ease;box-shadow:0 10px 30px rgba(0,0,0,0.2)'>
+                <div style='font-size:10px;font-weight:700;color:var(--grn);letter-spacing:1px;text-transform:uppercase'>SELECTED BY</div>
+                <div style='font-size:18px;font-weight:800;color:#fff;letter-spacing:-0.5px'>${sel.company}</div>
+                <div style='display:flex;align-items:center;gap:8px;margin-top:4px'>
+                    <span style='font-size:11px;color:rgba(255,255,255,0.5);display:flex;align-items:center;gap:4px'>🕒 ${sel.time}</span>
+                    <span style='width:4px;height:4px;background:rgba(255,255,255,0.2);border-radius:50%'></span>
+                    <span style='font-size:11px;color:var(--grn);font-weight:700'>ID: CONFIRMED</span>
+                </div>
             </div>`;
         });
-        h += `</div></div>`;
+        h += `</div>
+            </div>
+            <style>
+                .success-card::before {
+                    content: "";
+                    position: absolute;
+                    top: 0; left: 0; right: 0; bottom: 0;
+                    background: radial-gradient(circle at top right, rgba(34,197,94,0.1), transparent 60%);
+                    pointer-events: none;
+                }
+            </style>
+        </div>`;
     }
 
     // Profile Info Section
