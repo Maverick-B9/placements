@@ -335,8 +335,8 @@ function filterStu() {
         h += "<td style='max-width:200px'>" + (schedSummary || "<span style='color:var(--mut);font-size:10px'>None</span>") + "</td>";
         h += "<td style='white-space:nowrap'>";
         h += "<button class='btn btg bts' onclick=\"openAssignModal('" + s.usn + "')\">&#128205; Assign</button> ";
+        h += "<button class='btn btg bts' onclick=\"editStu('" + s.usn + "')\">Edit</button> ";
         h += "<button class='btn btg bts' onclick=\"updatePw('" + s.usn + "')\">&#128273; Pwd</button> ";
-        h += "<button class='btn btg bts' onclick=\"resetP('" + s.usn + "')\">&#8635; Reset</button> ";
         h += "<button class='btn btg bts' style='color:var(--red)' onclick=\"delStu('" + s.usn + "')\">Del</button>";
         h += "</td></tr>";
     });
@@ -470,26 +470,100 @@ function delStu(u) {
     }
 }
 
-function addStu() {
-    const u = prompt("USN:"); if (!u || !u.trim()) return;
-    const usn = u.trim();
-    if (RAW.find(x => x.usn.toLowerCase() === usn.toLowerCase())) {
-        alert('Student with USN ' + usn + ' already exists!'); return;
+function editStu(usn) {
+    const s = RAW.find(x => x.usn === usn) || { usn: '', name: '', branch: '', dob: '', email: '', phone: '', gender: '', cgpa: '', resume: '' };
+    const isNew = !usn;
+    closeStuModal();
+    const overlay = document.createElement('div');
+    overlay.id = 'stu-modal-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:9000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background:var(--surf);border:1px solid var(--bd);border-radius:14px;padding:24px;min-width:380px;max-width:500px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4)';
+
+    let h = "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:20px'>";
+    h += "<div style='font-size:16px;font-weight:700;color:var(--tx)'>" + (isNew ? 'Add New Student' : 'Edit Student Profile') + "</div>";
+    h += "<button onclick='closeStuModal()' style='background:none;border:none;color:var(--mut);font-size:18px;cursor:pointer'>&#10005;</button></div>";
+
+    const fields = [
+        { id: 'estu-usn', label: 'USN / ID', val: s.usn, ph: '4MH22CS001', req: true, readonly: !isNew },
+        { id: 'estu-name', label: 'Full Name', val: s.name, ph: 'John Doe', req: true },
+        { id: 'estu-branch', label: 'Branch', val: s.branch, ph: 'CSE / ISE / ECE' },
+        { id: 'estu-dob', label: 'Date of Birth', val: s.dob, ph: 'DD/MM/YYYY' },
+        { id: 'estu-gender', label: 'Gender', val: s.gender, ph: 'Male / Female / Other' },
+        { id: 'estu-email', label: 'Email ID', val: s.email, ph: 'john@example.com' },
+        { id: 'estu-phone', label: 'Phone Number', val: s.phone, ph: '9876543210' },
+        { id: 'estu-pct10', label: '10th Percentage', val: s.pct10 || '', ph: 'e.g. 95' },
+        { id: 'estu-pct12', label: '12th / Diploma %', val: s.pct12 || '', ph: 'e.g. 92' },
+        { id: 'estu-cgpa', label: 'B.E CGPA', val: s.cgpa || '', ph: 'e.g. 9.5' },
+        { id: 'estu-resume', label: 'Resume URL', val: s.resume || '', ph: 'https://link-to-resume.com' }
+    ];
+
+    h += "<div style='display:flex;flex-direction:column;gap:14px'>";
+    fields.forEach(f => {
+        h += "<div><label style='display:block;font-size:9px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px'>" + f.label + (f.req ? ' *' : '') + "</label>";
+        h += "<input type='text' id='" + f.id + "' value=\"" + (f.val || '').replace(/"/g, '&quot;') + "\" placeholder='" + f.ph + "' " + (f.readonly ? 'readonly style="opacity:.6;cursor:not-allowed"' : '') + " style='width:100%;padding:9px 13px;background:var(--surf2);border:1.5px solid var(--bd);border-radius:8px;color:var(--tx);font-size:13px;outline:none'></div>";
+    });
+    h += "</div>";
+
+    h += "<div style='margin-top:24px;display:flex;gap:10px;justify-content:flex-end'>";
+    h += "<button onclick='closeStuModal()' class='btn btg'>Cancel</button>";
+    h += "<button onclick=\"saveStu('" + (isNew ? '' : usn) + "')\" class='btn btp'>Save Changes</button></div>";
+
+    modal.innerHTML = h;
+    overlay.appendChild(modal);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeStuModal(); });
+    document.body.appendChild(overlay);
+}
+
+function saveStu(oldUsn) {
+    const isNew = !oldUsn;
+    const usn = document.getElementById('estu-usn').value.trim();
+    const name = document.getElementById('estu-name').value.trim();
+    if (!usn || !name) return alert('USN and Name are required!');
+
+    if (isNew && RAW.find(x => x.usn.toLowerCase() === usn.toLowerCase())) {
+        return alert('Student with USN ' + usn + ' already exists!');
     }
-    const n = prompt("Full Name:"); if (n === null) return;
-    const b = prompt("Branch (e.g. CSE, ISE):"); if (b === null) return;
-    const d = prompt("DOB (DD/MM/YYYY):"); if (d === null) return;
-    const times = ["10:00 AM \u2013 11:00 AM", "11:00 AM \u2013 12:00 PM", "12:00 PM \u2013 1:00 PM", "2:00 PM \u2013 3:00 PM", "3:00 PM \u2013 4:00 PM"];
-    // Initialize 25 sessions
-    const sched = [];
-    for (let i = 1; i <= 25; i++) {
-        sched.push({ round: i, company: '', time: times[(i - 1) % 5] || 'TBD', status: 'pending', remark: '', result: '' });
+
+    let s;
+    if (isNew) {
+        const times = ["10:00 AM – 11:00 AM", "11:00 AM – 12:00 PM", "12:00 PM – 1:00 PM", "2:00 PM – 3:00 PM", "3:00 PM – 4:00 PM"];
+        const sched = [];
+        for (let i = 1; i <= 25; i++) sched.push({ round: i, company: '', time: times[(i - 1) % 5] || 'TBD', status: 'pending', remark: '', result: '' });
+        s = { usn, name, schedule: sched };
+        RAW.push(s);
+    } else {
+        s = RAW.find(x => x.usn === oldUsn);
+        if (!s) return;
     }
-    const newStudent = { usn: usn, name: n || '', dob: d || '', password: d || '01/01/2000', branch: b || 'General', gender: '', pct10: '', pct12: '', cgpa: '', resume: '', schedule: sched };
-    RAW.push(newStudent);
-    _cloudSaveStudent(newStudent);
-    alert('Student ' + (n || usn) + ' added! You can now assign them to companies using the Assign button.');
+
+    s.name = name;
+    s.usn = usn;
+    s.branch = document.getElementById('estu-branch').value.trim();
+    s.dob = document.getElementById('estu-dob').value.trim();
+    s.gender = document.getElementById('estu-gender').value.trim();
+    s.email = document.getElementById('estu-email').value.trim();
+    s.phone = document.getElementById('estu-phone').value.trim();
+    s.pct10 = document.getElementById('estu-pct10').value.trim();
+    s.pct12 = document.getElementById('estu-pct12').value.trim();
+    s.cgpa = document.getElementById('estu-cgpa').value.trim();
+    s.resume = document.getElementById('estu-resume').value.trim();
+
+    if (isNew) s.password = s.dob || '01/01/2000';
+
+    _cloudSaveStudent(s);
+    alert('Student profile saved successfully!');
+    closeStuModal();
     filterStu();
+}
+
+function closeStuModal() {
+    const el = document.getElementById('stu-modal-overlay');
+    if (el) el.remove();
+}
+
+function addStu() {
+    editStu('');
 }
 
 let _expandedComp = null;
