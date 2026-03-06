@@ -1883,7 +1883,22 @@ function doLogout() {
 }
 
 function renderStudent() {
+    const selections = CUR.schedule.filter(s => s.result === 'selected' && s.company);
     let h = `<div class='wb'><div><div class='wbn'>Welcome, ${CUR.name}</div><div class='wbs'>${CUR.branch} &middot; ${CUR.usn}</div></div><div class='wbb'>Student Dashboard</div></div>`;
+
+    if (selections.length > 0) {
+        h += `<div class='card' style='margin-bottom:20px;background:linear-gradient(135deg, rgba(34,197,94,0.1), rgba(34,197,94,0.02));border:1px solid var(--grn)'>
+            <div class='ctit' style='color:var(--grn)'><div class='dot' style='background:var(--grn)'></div>PLACEMENT SUCCESS — CONGRATULATIONS!</div>
+            <div style='padding:4px 0 10px 0;display:flex;flex-wrap:wrap;gap:10px'>`;
+        selections.forEach(sel => {
+            h += `<div style='background:white;border:1px solid var(--grn);padding:10px 16px;border-radius:12px;display:flex;flex-direction:column;gap:4px;box-shadow:0 4px 12px rgba(34,197,94,0.1)'>
+                <div style='font-size:10px;font-weight:700;color:var(--grn);letter-spacing:0.5px'>SELECTED BY</div>
+                <div style='font-size:14px;font-weight:800;color:var(--tx)'>${sel.company}</div>
+                <div style='font-size:10px;color:var(--mut)'>${sel.time}</div>
+            </div>`;
+        });
+        h += `</div></div>`;
+    }
 
     // Profile Info Section
     h += `<div class='card' style='margin-bottom:20px'>
