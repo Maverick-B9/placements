@@ -384,12 +384,13 @@ function openAssignModal(usn) {
     // Session rows
     const times = ["10:00 AM\u201311:00 AM", "11:00 AM\u201312:00 PM", "12:00 PM\u20131:00 PM", "2:00 PM\u20133:00 PM", "3:00 PM\u20134:00 PM"];
     mh += "<div style='display:flex;flex-direction:column;gap:10px'>";
-    s.schedule.forEach((sc, i) => {
+    for (let i = 0; i < 25; i++) {
         const sessionNum = i + 1;
+        const sc = s.schedule[i] || { round: sessionNum, company: '', time: times[i % 5] || 'TBD', status: 'pending', remark: '', result: '' };
         mh += "<div style='background:var(--surf2);border:1px solid var(--bd);border-radius:10px;padding:12px'>";
         mh += "<div style='display:flex;align-items:center;gap:8px;margin-bottom:8px'>";
         mh += "<span style='background:var(--ind);color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700'>Session " + sessionNum + "</span>";
-        mh += "<span style='font-size:10px;color:var(--mut)'>" + times[i] + "</span></div>";
+        mh += "<span style='font-size:10px;color:var(--mut)'>" + sc.time + "</span></div>";
         mh += "<div style='display:flex;gap:8px;align-items:center'>";
         mh += "<select id='am-comp-" + sessionNum + "' style='flex:1;padding:7px 10px;background:var(--surf);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:11px'>";
         mh += "<option value=''>-- None --</option>";
@@ -400,7 +401,7 @@ function openAssignModal(usn) {
         mh += "</div>";
         if (sc.company) mh += "<div style='margin-top:6px;font-size:10px;color:var(--cyn);font-weight:600'>&#128205; Currently: " + sc.company + "</div>";
         mh += "</div>";
-    });
+    }
     mh += "</div>";
     mh += "<div style='margin-top:16px;text-align:right'><button onclick='closeAssignModal()' class='btn btg'>Close</button></div>";
     modal.innerHTML = mh;
@@ -420,6 +421,11 @@ function applyAssign(usn, sessionIdx) {
     const sel = document.getElementById('am-comp-' + (sessionIdx + 1));
     if (!sel) return;
     const companyName = sel.value;
+    // Ensure schedule slot exists
+    if (!s.schedule[sessionIdx]) {
+        const times = ["10:00 AM\u201311:00 AM", "11:00 AM\u201312:00 PM", "12:00 PM\u20131:00 PM", "2:00 PM\u20133:00 PM", "3:00 PM\u20134:00 PM"];
+        s.schedule[sessionIdx] = { round: sessionIdx + 1, company: '', time: times[sessionIdx % 5] || 'TBD', status: 'pending', remark: '', result: '' };
+    }
     const sc = s.schedule[sessionIdx];
     sc.company = companyName;
     _cloudSaveChange(usn, sessionIdx, sc);
@@ -429,7 +435,7 @@ function applyAssign(usn, sessionIdx) {
 
 function clearAssign(usn, sessionIdx) {
     const s = RAW.find(x => x.usn === usn);
-    if (!s) return;
+    if (!s || !s.schedule[sessionIdx]) return;
     s.schedule[sessionIdx].company = '';
     _cloudSaveChange(usn, sessionIdx, s.schedule[sessionIdx]);
     openAssignModal(usn);
@@ -684,7 +690,11 @@ function switchAssignSession(sn) {
 
 function toggleAssign(usn, sessionIdx, assign, companyName) {
     const s = RAW.find(x => x.usn === usn);
-    if (!s || !s.schedule[sessionIdx]) return;
+    if (!s) return;
+    if (!s.schedule[sessionIdx]) {
+        const times = ["10:00 AM\u201311:00 AM", "11:00 AM\u201312:00 PM", "12:00 PM\u20131:00 PM", "2:00 PM\u20133:00 PM", "3:00 PM\u20134:00 PM"];
+        s.schedule[sessionIdx] = { round: sessionIdx + 1, company: '', time: times[sessionIdx % 5] || 'TBD', status: 'pending', remark: '', result: '' };
+    }
     const sc = s.schedule[sessionIdx];
     sc.company = assign ? companyName : '';
     _cloudSaveChange(usn, sessionIdx, sc);
@@ -703,7 +713,11 @@ function bulkAssignAll(companyName) {
     let changeCount = 0;
 
     filtered.forEach(s => {
-        if (s.schedule[sessionIdx] && s.schedule[sessionIdx].company !== companyName) {
+        if (!s.schedule[sessionIdx]) {
+            const times = ["10:00 AM\u201311:00 AM", "11:00 AM\u201312:00 PM", "12:00 PM\u20131:00 PM", "2:00 PM\u20133:00 PM", "3:00 PM\u20134:00 PM"];
+            s.schedule[sessionIdx] = { round: sessionIdx + 1, company: '', time: times[sessionIdx % 5] || 'TBD', status: 'pending', remark: '', result: '' };
+        }
+        if (s.schedule[sessionIdx].company !== companyName) {
             s.schedule[sessionIdx].company = companyName;
             const docId = s.usn + '_' + sessionIdx;
             const ref = db.collection('changes').doc(docId);
