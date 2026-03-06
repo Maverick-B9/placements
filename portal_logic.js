@@ -1048,7 +1048,8 @@ function dlPDF(type) {
 }
 
 function _buildCompanyPDF(doc, companyName, pw, ph, mx, my, cw) {
-    const sessions = [1, 2, 3, 4, 5];
+    const sessions = [];
+    for (let i = 1; i <= 25; i++) sessions.push(i);
     const times = [
         "10:00 AM – 11:00 AM",
         "11:00 AM – 12:00 PM",
