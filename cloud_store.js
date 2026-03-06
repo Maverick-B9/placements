@@ -174,7 +174,11 @@ function _cloudLoadAllChanges(callback) {
                 var sessionIdx = parseInt(parts.pop());
                 var usn = parts.join('_');
                 var s = RAW.find(function (x) { return x.usn === usn; });
-                if (s && s.schedule[sessionIdx]) {
+                if (s) {
+                    if (!s.schedule[sessionIdx]) {
+                        const times = ["10:00 AM\u201311:00 AM", "11:00 AM\u201312:00 PM", "12:00 PM\u20131:00 PM", "2:00 PM\u20133:00 PM", "3:00 PM\u20134:00 PM"];
+                        s.schedule[sessionIdx] = { round: sessionIdx + 1, company: '', time: times[sessionIdx % 5] || 'TBD', status: 'pending', remark: '', result: '' };
+                    }
                     if (data.status) s.schedule[sessionIdx].status = data.status;
                     if (data.result !== undefined) s.schedule[sessionIdx].result = data.result;
                     if (data.remark !== undefined) s.schedule[sessionIdx].remark = data.remark;

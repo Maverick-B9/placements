@@ -115,15 +115,14 @@ function switchCompSession(n) {
 }
 
 function renderCompanyRoster(n) {
-    const sessions = [1, 2, 3, 4, 5];
     if (!window._compSL) {
         window._compSL = {};
-        sessions.forEach(sn => {
+        for (let sn = 1; sn <= 25; sn++) {
             window._compSL[sn] = RAW.filter(s => {
                 const sc = s.schedule[sn - 1];
                 return sc && sc.company === CUR;
             });
-        });
+        }
     }
     const list = window._compSL[n] || [];
     const room = ROOM_DATA[CUR] || '\u2014';
@@ -249,13 +248,13 @@ function renderActivityLog() {
 }
 
 function dlCompCSV() {
-    const list = RAW.filter(s => s.schedule.some(sc => sc.company === CUR));
+    const list = RAW.filter(s => s.schedule.slice(0, 25).some(sc => sc.company === CUR));
     const rows = list.map(s => {
-        const sc = s.schedule.find(x => x.company === CUR);
+        const sc = s.schedule.slice(0, 25).find(x => x.company === CUR);
         const sIdx = s.schedule.indexOf(sc) + 1;
         const statusLabel = sc.status === 'selection' ? 'Present' : (sc.status === 'rejected' ? 'Absent' : 'Pending');
         const resultLabel = sc.result === 'selected' ? 'Selected' : (sc.result === 'rejected' ? 'Rejected' : (sc.result === 'next_round' ? 'Next Round' : ''));
-        return '"' + s.usn + '","' + s.name + '","' + s.branch + '","' + s.email + '",' + sIdx + ',"' + statusLabel + '","' + resultLabel + '","' + (sc.remark || '') + '"';
+        return '"' + s.usn + '","' + s.name + '","' + (s.branch || '') + '","' + (s.email || '') + '",' + sIdx + ',"' + statusLabel + '","' + resultLabel + '","' + (sc.remark || '').replace(/"/g, '""') + '"';
     });
     const csv = "USN,Name,Branch,Email,Session,Attendance,Result,Remark\n" + rows.join("\n");
     const a = document.createElement('a');

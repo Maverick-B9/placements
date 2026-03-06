@@ -499,7 +499,7 @@ let _assignListLimit = 30; // PERFORMANCE: Limit initial render to 30 students
 function renderByCompany(b) {
     const compCounts = {};
     COMPANY.forEach(c => {
-        compCounts[c] = RAW.filter(s => s.schedule.some(sc => sc.company === c)).length;
+        compCounts[c] = RAW.filter(s => s.schedule.slice(0, 25).some(sc => sc.company === c)).length;
     });
     const sorted = [...COMPANY].sort((a, b2) => compCounts[b2] - compCounts[a]);
     let h = "<div class='sb'><input type='text' id='comp-q' placeholder='Search company...' oninput='filterCompList()' style='flex:1;max-width:280px'><button class='btn btp' onclick='addComp()'>+ Add Company</button></div>";
@@ -571,15 +571,15 @@ function _buildCompanyAssignPanel(c) {
     let h = "<div style='background:var(--surf2);border-top:2px solid var(--ind);padding:16px 20px'>";
     h += "<div style='font-size:13px;font-weight:700;color:var(--ind);margin-bottom:12px'>&#128101; Assign Students \u2014 " + c + "</div>";
     // Session tabs
-    h += "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px'>";
-    for (let sn = 1; sn <= 5; sn++) {
+    h += "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;max-height:100px;overflow-y:auto;padding-bottom:10px'>";
+    for (let sn = 1; sn <= 25; sn++) {
         const cnt = RAW.filter(s => s.schedule[sn - 1] && s.schedule[sn - 1].company === c).length;
         const active = _expandedSession === sn;
         const safeName = c.replace(/[^a-z0-9]/gi, '_');
-        h += "<div id='cs-tab-" + safeName + "-" + sn + "' onclick='switchAssignSession(" + sn + ")' style='cursor:pointer;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid " + (active ? 'var(--ind)' : 'var(--bd)') + ";background:" + (active ? 'var(--ind)' : 'transparent') + ";color:" + (active ? '#fff' : 'var(--mut)') + "'>Session " + sn + " (" + cnt + ")</div>";
+        h += "<div id='cs-tab-" + safeName + "-" + sn + "' onclick='switchAssignSession(" + sn + ")' style='cursor:pointer;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid " + (active ? 'var(--ind)' : 'var(--bd)') + ";background:" + (active ? 'var(--ind)' : 'transparent') + ";color:" + (active ? '#fff' : 'var(--mut)') + "'>S" + sn + " (" + cnt + ")</div>";
     }
     h += "</div>";
-    h += "<div style='font-size:10px;color:var(--mut);margin-bottom:10px'>" + times[_expandedSession - 1] + "</div>";
+    h += "<div id='assign-time-label' style='font-size:10px;color:var(--mut);margin-bottom:10px'>" + (times[(_expandedSession - 1) % 5] || 'TBD') + "</div>";
     // Student checklist with search
     h += "<input type='text' id='assign-stu-q' placeholder='Search students...' oninput='filterAssignStudents(this)' style='width:100%;padding:10px 14px;background:var(--surf);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:12px;margin-bottom:12px;box-sizing:border-box;outline:none;box-shadow:0 2px 10px rgba(0,0,0,.1)'>";
     h += "<div id='assign-stu-list' style='max-height:400px;overflow-y:auto;border:1px solid var(--bd);border-radius:8px;background:var(--surf);position:relative'>";
@@ -668,24 +668,45 @@ function _refreshAssignPanelUI(companyName, sessionIdx, q) {
         listEl.innerHTML = _buildAssignStudentList(companyName, sessionIdx + 1, q);
         // Do NOT auto-scroll to top when merely adding/removing, only on search
     }
-
+    const times = ["10:00 AM\u201311:00 AM", "11:00 AM\u201312:00 PM", "12:00 PM\u20131:00 PM", "2:00 PM\u20133:00 PM", "3:00 PM\u20134:00 PM"];
     const safeName = companyName.replace(/[^a-z0-9]/gi, '_');
     const tabEl = document.getElementById('cs-tab-' + safeName + '-' + (sessionIdx + 1));
     const cnt = RAW.filter(st => st.schedule[sessionIdx] && st.schedule[sessionIdx].company === companyName).length;
-    if (tabEl) tabEl.textContent = 'Session ' + (sessionIdx + 1) + ' (' + cnt + ')';
+    if (tabEl) tabEl.textContent = 'S' + (sessionIdx + 1) + ' (' + cnt + ')';
 
     const footerEl = document.getElementById('cs-footer-' + safeName + '-' + (sessionIdx + 1));
     if (footerEl) footerEl.textContent = cnt + ' assigned to this session';
 
     const totalCntEl = document.getElementById('comp-cnt-' + safeName);
-    const totalDistinct = RAW.filter(st => st.schedule.some(sci => sci.company === companyName)).length;
+    const totalDistinct = RAW.filter(st => st.schedule.slice(0, 25).some(sc => sc.company === companyName)).length;
     if (totalCntEl) totalCntEl.textContent = totalDistinct + ' students';
+
+    const timeLabelEl = document.getElementById('assign-time-label');
+    if (timeLabelEl) timeLabelEl.textContent = (times[sessionIdx % 5] || 'TBD');
 }
 
 function switchAssignSession(sn) {
     _expandedSession = sn;
     _assignListLimit = 30; // Reset limit
-    changeAdminTab('c');
+    if (_expandedComp) {
+        // Find the panel and refresh only that part
+        const times = ["10:00 AM\u201311:00 AM", "11:00 AM\u201312:00 PM", "12:00 PM\u20131:00 PM", "2:00 PM\u20133:00 PM", "3:00 PM\u20134:00 PM"];
+        const safeName = _expandedComp.replace(/[^a-z0-9]/gi, '_');
+
+        // Update tabs active state
+        for (let x = 1; x <= 25; x++) {
+            const el = document.getElementById('cs-tab-' + safeName + '-' + x);
+            if (el) {
+                const active = x === sn;
+                el.style.background = active ? 'var(--ind)' : 'transparent';
+                el.style.color = active ? '#fff' : 'var(--mut)';
+                el.style.borderColor = active ? 'var(--ind)' : 'var(--bd)';
+            }
+        }
+        _refreshAssignPanelUI(_expandedComp, sn - 1, (document.getElementById('assign-stu-q') || { value: '' }).value);
+    } else {
+        changeAdminTab('c');
+    }
 }
 
 function toggleAssign(usn, sessionIdx, assign, companyName) {
@@ -931,6 +952,7 @@ function renderReports(b) {
     COMPANY.forEach(c => { h += "<option value=\"" + c + "\">" + c + "</option>"; });
     h += "</select><button class='btn btp' onclick=\"dlPDF('comp')\">&#128196; Download Company PDF</button>";
     h += "<button class='btn btg' onclick=\"dlCSV('comp')\">Download CSV</button>";
+    h += "<button class='btn btg' onclick='dlPlacedStudentsCSV()' style='background:var(--grn);border-color:var(--grn);color:#fff'>Download Placed Students (Distinct CSV)</button>";
     h += "<button class='btn btp' style='background:linear-gradient(135deg, var(--ind), var(--indl));margin-left:auto' onclick=\"dlAllCompaniesSummary()\">&#128196; Download Every Report (Global CSV)</button></div></div>";
     b.innerHTML = h;
 }
@@ -949,6 +971,21 @@ function dlAllCompaniesSummary() {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     a.download = "all_placement_reports_summary.csv";
+    a.click();
+}
+
+function dlPlacedStudentsCSV() {
+    const placed = RAW.filter(s => s.schedule.slice(0, 25).some(sc => sc.result === 'selected'));
+    if (placed.length === 0) { alert("No students found with 'Selected' result."); return; }
+    const rows = placed.map(s => {
+        const selections = s.schedule.slice(0, 25).filter(sc => sc.result === 'selected').map(sc => sc.company).filter(Boolean);
+        const uniqueComps = [...new Set(selections)].join(' | ');
+        return '"' + s.usn + '","' + s.name + '","' + (s.branch || '') + '","' + uniqueComps + '"';
+    });
+    const csv = "USN,Name,Branch,Placed Companies\n" + rows.join("\n");
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = "placed_students_distinct_" + new Date().toISOString().split('T')[0] + ".csv";
     a.click();
 }
 
