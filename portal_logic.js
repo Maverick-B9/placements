@@ -379,7 +379,7 @@ function openAssignModal(usn) {
     modal.style.cssText = 'background:var(--surf);border:1px solid var(--bd);border-radius:14px;padding:24px;min-width:380px;max-width:520px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4)';
     let mh = "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:16px'>";
     mh += "<div><div style='font-size:15px;font-weight:700;color:var(--tx)'>Assign Company to " + s.name + "</div>";
-    mh += "<div style='font-size:10px;color:var(--mut);margin-top:2px'>" + s.usn + " &middot; " + s.branch + "</div></div>";
+    mh += "<div style='font-size:10px;color:var(--mut);margin-top:2px'>" + s.usn + " &middot; " + s.branch + " &middot; <button onclick=\"editStu('" + usn + "')\" style='background:none;border:none;color:var(--ind);font-size:10px;font-weight:700;cursor:pointer;padding:0;text-decoration:underline'>Edit Profile / Upgrade</button></div></div>";
     mh += "<button onclick='closeAssignModal()' style='background:none;border:none;color:var(--mut);font-size:18px;cursor:pointer;padding:4px 8px'>&#10005;</button></div>";
     // Session rows
     const times = ["10:00 AM\u201311:00 AM", "11:00 AM\u201312:00 PM", "12:00 PM\u20131:00 PM", "2:00 PM\u20133:00 PM", "3:00 PM\u20134:00 PM"];
@@ -698,11 +698,14 @@ function _buildAssignStudentList(c, sessionNum, q) {
             h += "<td style='padding:8px 12px'><span style='color:var(--mut);font-size:10px'>—</span></td>";
         }
         h += "<td style='padding:8px 12px'>";
+        h += "<div style='display:flex;gap:4px'>";
         if (isAssigned) {
             h += "<button onclick=\"toggleAssign('" + s.usn + "'," + sessionIdx + ",false,'" + c.replace(/'/g, "\\'") + "')\" style='padding:3px 10px;border:1px solid var(--red);color:var(--red);background:transparent;border-radius:6px;font-size:10px;cursor:pointer'>Remove</button>";
         } else {
             h += "<button onclick=\"toggleAssign('" + s.usn + "'," + sessionIdx + ",true,'" + c.replace(/'/g, "\\'") + "')\" style='padding:3px 10px;border:1px solid var(--ind);color:var(--ind);background:transparent;border-radius:6px;font-size:10px;cursor:pointer'>Add</button>";
         }
+        h += "<button onclick=\"editStu('" + s.usn + "')\" style='padding:3px 8px;border:1px solid var(--bd);color:var(--mut);background:transparent;border-radius:6px;font-size:10px;cursor:pointer'>Edit</button>";
+        h += "</div>";
         h += "</td></tr>";
     });
     h += "</tbody></table>";
