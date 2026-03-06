@@ -2272,9 +2272,6 @@ function renderByCompany(b) {
     h += _buildCompanyListHTML(sorted, compCounts);
     h += "</div>";
     b.innerHTML = h;
-    if (_expandedComp) {
-        setTimeout(() => openCompSessions(_expandedComp), 50);
-    }
 }
 
 function _buildCompanyListHTML(sorted, compCounts) {
@@ -2333,7 +2330,7 @@ function openCompSessions(c) {
 
 function _buildCompanyAssignPanel(c) {
     const times = ["10:00 AM\u201311:00 AM", "11:00 AM\u201312:00 PM", "12:00 PM\u20131:00 PM", "2:00 PM\u20133:00 PM", "3:00 PM\u20134:00 PM"];
-    let h = "<div style='background:var(--surf2);border-top:2px solid var(--ind);padding:16px 20px'>";
+    let h = "<div onclick='event.stopPropagation()' style='background:var(--surf2);border-top:2px solid var(--ind);padding:16px 20px'>";
     h += "<div style='font-size:13px;font-weight:700;color:var(--ind);margin-bottom:12px'>&#128101; Assign Students \u2014 " + c + "</div>";
     // Session tabs
     h += "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;max-height:100px;overflow-y:auto;padding-bottom:10px'>";
@@ -2346,8 +2343,8 @@ function _buildCompanyAssignPanel(c) {
     h += "</div>";
     h += "<div id='assign-time-label' style='font-size:10px;color:var(--mut);margin-bottom:10px'>" + (times[(_expandedSession - 1) % 5] || 'TBD') + "</div>";
     // Student checklist with search
-    h += "<input type='text' id='assign-stu-q' placeholder='Search students...' oninput='filterAssignStudents(this)' style='width:100%;padding:10px 14px;background:var(--surf);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:12px;margin-bottom:12px;box-sizing:border-box;outline:none;box-shadow:0 2px 10px rgba(0,0,0,.1)'>";
-    h += "<div id='assign-stu-list' style='max-height:400px;overflow-y:auto;border:1px solid var(--bd);border-radius:8px;background:var(--surf);position:relative'>";
+    h += "<input type='text' id='assign-stu-q' placeholder='Search students...' oninput='filterAssignStudents(this)' style='width:100%;padding:10px 14px;background:var(--surf);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:12px;margin-bottom:12px;box-sizing:border-box;outline:none;box-shadow:0 2px 10px rgba(0,0,0,.1);position:relative;z-index:20'>";
+    h += "<div id='assign-stu-list' style='max-height:400px;overflow-y:auto;display:block;width:100%;border:1px solid var(--bd);border-radius:8px;background:var(--surf);position:relative'>";
     h += _buildAssignStudentList(c, _expandedSession, '');
     h += "</div>";
     // Bulk actions
