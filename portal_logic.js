@@ -220,9 +220,19 @@ function renderOverview(b) {
     h += "</div>";
 
     // Selection result stats
-    h += "<div style='font-size:9px;font-weight:700;color:var(--mut);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px'>SELECTION RESULTS</div>";
+    let placedSet = new Set();
+    RAW.forEach(s => {
+        if (s.schedule.some(sc => sc.result === 'selected')) placedSet.add(s.usn);
+    });
+    const placedCount = placedSet.size;
+
+    h += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px'>";
+    h += "<div style='font-size:9px;font-weight:700;color:var(--mut);letter-spacing:1.2px;text-transform:uppercase'>SELECTION RESULTS</div>";
+    h += "<div style='font-size:9px;font-weight:700;color:var(--grn)'>DISTINCT PLACED: " + placedCount + "</div>";
+    h += "</div>";
+
     h += "<div class='sg admin-stats' style='grid-template-columns:repeat(3,1fr);margin-bottom:22px'>";
-    h += "<div class='sc' style='border-left:2px solid var(--grn)'><div class='sl'>SELECTED</div><div class='sv' style='color:var(--grn)'>" + selected + "</div></div>";
+    h += "<div class='sc' style='border-left:2px solid var(--grn)'><div class='sl'>TOTAL SELECTIONS</div><div class='sv' style='color:var(--grn)'>" + selected + "</div></div>";
     h += "<div class='sc' style='border-left:2px solid var(--red)'><div class='sl'>REJECTED</div><div class='sv' style='color:var(--red)'>" + rejectedR + "</div></div>";
     h += "<div class='sc' style='border-left:2px solid var(--amb)'><div class='sl'>NEXT ROUND</div><div class='sv' style='color:var(--amb)'>" + nextRound + "</div></div>";
     h += "</div>";
@@ -464,7 +474,11 @@ function addStu() {
     const b = prompt("Branch (e.g. CSE, ISE):"); if (b === null) return;
     const d = prompt("DOB (DD/MM/YYYY):"); if (d === null) return;
     const times = ["10:00 AM \u2013 11:00 AM", "11:00 AM \u2013 12:00 PM", "12:00 PM \u2013 1:00 PM", "2:00 PM \u2013 3:00 PM", "3:00 PM \u2013 4:00 PM"];
-    const sched = [1, 2, 3, 4, 5].map((i, idx) => ({ round: i, company: '', time: times[idx], status: 'pending', remark: '', result: '' }));
+    // Initialize 25 sessions
+    const sched = [];
+    for (let i = 1; i <= 25; i++) {
+        sched.push({ round: i, company: '', time: times[(i - 1) % 5] || 'TBD', status: 'pending', remark: '', result: '' });
+    }
     const newStudent = { usn: usn, name: n || '', dob: d || '', password: d || '01/01/2000', branch: b || 'General', gender: '', pct10: '', pct12: '', cgpa: '', resume: '', schedule: sched };
     RAW.push(newStudent);
     _cloudSaveStudent(newStudent);
@@ -902,8 +916,26 @@ function renderReports(b) {
     h += "<div class='sb' style='flex-wrap:wrap;gap:10px'><select id='rep-sel'><option value=''>Select Company...</option>";
     COMPANY.forEach(c => { h += "<option value=\"" + c + "\">" + c + "</option>"; });
     h += "</select><button class='btn btp' onclick=\"dlPDF('comp')\">&#128196; Download Company PDF</button>";
-    h += "<button class='btn btg' onclick=\"dlCSV('comp')\">Download CSV</button></div></div>";
+    h += "<button class='btn btg' onclick=\"dlCSV('comp')\">Download CSV</button>";
+    h += "<button class='btn btp' style='background:linear-gradient(135deg, var(--ind), var(--indl));margin-left:auto' onclick=\"dlAllCompaniesSummary()\">&#128196; Download Every Report (Global CSV)</button></div></div>";
     b.innerHTML = h;
+}
+
+function dlAllCompaniesSummary() {
+    let csv = "USN,Name,Branch,Email,Session,Company,Attendance,Result,Remark\n";
+    RAW.forEach(s => {
+        s.schedule.forEach((sc, i) => {
+            if (sc.company) {
+                const statusLabel = sc.status === 'selection' ? 'Present' : (sc.status === 'rejected' ? 'Absent' : 'Pending');
+                const resultLabel = sc.result === 'selected' ? 'Selected' : (sc.result === 'rejected' ? 'Rejected' : (sc.result === 'next_round' ? 'Next Round' : 'No Decision'));
+                csv += `"${s.usn}","${s.name}","${s.branch || ''}","${s.email || ''}",${i + 1},"${sc.company}","${statusLabel}","${resultLabel}","${(sc.remark || '').replace(/"/g, '""')}"\n`;
+            }
+        });
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = "all_placement_reports_summary.csv";
+    a.click();
 }
 
 function dlCSV(type) {

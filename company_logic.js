@@ -2,7 +2,8 @@
 if (!window._compLog) window._compLog = [];
 
 function renderCompany() {
-    const sessions = [1, 2, 3, 4, 5];
+    const sessions = [];
+    for (let i = 1; i <= 25; i++) sessions.push(i);
     const times = [
         "10:00 AM \u2013 11:00 AM",
         "11:00 AM \u2013 12:00 PM",
@@ -68,16 +69,16 @@ function renderCompany() {
     h += "<div style='display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px'>";
     h += "<div><div style='font-size:13px;font-weight:700;color:var(--tx)'>Student Roster</div>";
     h += "<div style='font-size:9px;color:var(--mut)'>Select session &rarr; mark attendance &amp; result &rarr; add remarks</div></div>";
-    h += "<div id='comp-session-time' style='font-size:10px;color:var(--mut)'>" + times[defaultTab - 1] + "</div></div>";
+    h += "<div id='comp-session-time' style='font-size:10px;color:var(--mut)'>" + (times[defaultTab - 1] || 'TBD') + "</div></div>";
 
-    h += "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px'>";
+    h += "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;max-height:120px;overflow-y:auto;padding:4px'>";
     sessions.forEach(n => {
         const cnt = sessionLists[n].length;
         const baseStyle = "cursor:pointer;padding:4px 13px;border-radius:20px;font-size:10px;font-weight:600;border:1px solid var(--bd);";
         const onStyle = "background:var(--ind);color:#fff;border-color:var(--ind)";
         const offStyle = "background:transparent;color:var(--mut)";
         const s = n === defaultTab ? onStyle : offStyle;
-        h += "<div onclick='switchCompSession(" + n + ")' id='cst-" + n + "' style='" + baseStyle + s + "'>Session " + n + " (" + cnt + ")</div>";
+        h += "<div onclick='switchCompSession(" + n + ")' id='cst-" + n + "' style='" + baseStyle + s + "'>S" + n + " (" + cnt + ")</div>";
     });
     h += "</div>";
     h += "<div id='comp-roster-body'></div></div>";
@@ -101,15 +102,15 @@ function switchCompSession(n) {
         "2:00 PM \u2013 3:00 PM",
         "3:00 PM \u2013 4:00 PM"
     ];
-    [1, 2, 3, 4, 5].forEach(x => {
+    for (let x = 1; x <= 25; x++) {
         const el = document.getElementById('cst-' + x);
         if (el) {
             if (x === n) { el.style.background = 'var(--ind)'; el.style.color = '#fff'; el.style.borderColor = 'var(--ind)'; }
             else { el.style.background = 'transparent'; el.style.color = 'var(--mut)'; el.style.borderColor = 'var(--bd)'; }
         }
-    });
+    }
     const timeEl = document.getElementById('comp-session-time');
-    if (timeEl) timeEl.textContent = times[n - 1];
+    if (timeEl) timeEl.textContent = times[n - 1] || 'TBD';
     renderCompanyRoster(n);
 }
 
